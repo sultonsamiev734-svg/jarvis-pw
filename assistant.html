@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#00eaff">
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Jarvis 3.0 Ultra</title>
+<style>
+  :root{
+    --accent:#00eaff;
+    --bg:#000;
+    --dim:#051016;
+    --danger:#ff3b3b;
+    --text:#aef7ff;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#000 0%, #041018 60%);color:var(--text);font-family:Inter, Arial, sans-serif}
+  .wrap{max-width:1000px;margin:20px auto;padding:20px}
+  header{display:flex;align-items:center;gap:20px}
+  h1{margin:0;font-weight:600;letter-spacing:1px;text-shadow:0 0 16px rgba(0,234,255,0.08)}
+  #reactor{width:220px;height:220px;border-radius:50%;margin:18px auto;position:relative;display:grid;place-items:center}
+  .ring{position:absolute;border-radius:50%;box-shadow:0 0 30px var(--accent);border:2px solid rgba(0,234,255,0.06)}
+  .ring.r1{width:100%;height:100%;animation:spin 20s linear infinite}
+  .ring.r2{width:140%;height:140%;transform:translate(-10%,-10%);animation:spin 30s linear reverse infinite;opacity:.5}
+  .core{width:60%;height:60%;border-radius:50%;background:radial-gradient(ellipse,#00303b 0%, #001617 100%);display:grid;place-items:center;box-shadow:0 0 40px rgba(0,234,255,0.12) inset}
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  button{padding:12px 18px;border-radius:10px;border:none;background:var(--accent);color:#001;font-weight:700;cursor:pointer}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  #status{padding:8px 12px;border-radius:8px;background:rgba(0,0,0,0.25);box-shadow:inset 0 0 8px rgba(0,0,0,0.6)}
+  #log{height:160px;overflow:auto;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px;border-radius:10px;margin-top:12px;font-size:14px;}
+  .controls{display:flex;gap:10px;align-items:center}
+  .mode{padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.02);cursor:pointer}
+  .mode.active{background:linear-gradient(90deg,var(--accent),#59d2ff);color:#001;font-weight:700}
+  .small{font-size:13px;opacity:.9}
+  .chip{padding:6px 8px;border-radius:8px;background:#021417;border:1px solid rgba(0,234,255,0.06)}
+  footer{margin-top:18px;font-size:13px;color:rgba(174,247,255,0.7)}
+  .scanline{height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);margin-top:10px;border-radius:2px;opacity:0;}
+  .visual-beep{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);opacity:0;transition:0.12s}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>JARVIS 3.0 Ultra</h1>
+      <div class="small">Голосовой помощник — нажми <b>Запустить</b> 1 раз, чтобы активировать постоянное прослушивание.</div>
+    </div>
+    <div style="margin-left:auto">
+      <div id="status" class="chip">Статус: Ожидание</div>
+    </div>
+  </header>
+
+  <div id="reactor">
+    <div class="ring r2"></div>
+    <div class="ring r1"></div>
+    <div class="core">
+      <div id="core-text">OFF</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="controls">
+      <button id="startBtn">🚀 Запустить Jarvis</button>
+      <button id="stopBtn" disabled>⏹ Остановить</button>
+      <div class="chip">Режим: <span id="modeLabel">Нормальный</span></div>
+      <div class="chip">Голос: <span id="voiceLabel">по умолчанию</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:8px">
+        <div class="visual-beep" id="vbeep"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:320px">
+      <div class="row" style="gap:8px;margin-bottom:8px">
+        <div class="mode" data-mode="normal">Нормальный</div>
+        <div class="mode" data-mode="combat">Боевой</div>
+        <div class="mode" data-mode="silent">Тихий</div>
+        <div class="mode" data-mode="night">Ночной</div>
+      </div>
+
+      <div id="log" aria-live="polite"></div>
+    </div>
+
+    <div style="width:320px">
+      <div style="background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.2));padding:12px;border-radius:10px">
+        <div class="small" style="margin-bottom:8px">Команды (пример):</div>
+        <ul class="small">
+          <li>"Джарвис" — привлечь внимание</li>
+          <li>"включи музыку" — локальный файл music.mp3</li>
+          <li>"открой ютуб/гугл/инстаграм/тик ток/вконтакте"</li>
+          <li>"найди {запрос}" — поиск в Google</li>
+          <li>"какое время" / "какая дата"</li>
+          <li>"скажи шутку" / "сканирование"</li>
+          <li>"запомни команду {фраза} => {действие}"</li>
+          <li>"режим боевой/ночной/тихий/нормальный"</li>
+          <li>"эффект робот" / "эффект обычный"</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:10px;padding:10px;background:#001216;border-radius:10px">
+        <div class="small">PWA (опционально):</div>
+        <div class="small">Чтобы установить: открой меню браузера → «Установить приложение» или "Add to Desktop". В PWA Jarvis можно запускать как приложение.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scanline" id="scanline"></div>
+
+  <footer>Создано легально — микрофон активируется после твоего клика и разрешения. После первого одобрения Jarvis может слушать постоянно.</footer>
+</div>
+
+<script>
+  // регистрация service worker (PWA) — если доступно
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => console.log('SW registered', reg))
+    .catch(err => console.log('SW registration failed', err));
+}
+
+/* Jarvis 3.0 Ultra — single-file. Сохрани как assistant.html и положи music.mp3 рядом. */
+(async function(){
+  // DOM
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn  = document.getElementById('stopBtn');
+  const statusEl = document.getElementById('status');
+  const coreText = document.getElementById('core-text');
+  const logEl    = document.getElementById('log');
+  const modesEls = document.querySelectorAll('.mode');
+  const modeLabel= document.getElementById('modeLabel');
+  const voiceLabel= document.getElementById('voiceLabel');
+  const vbeep = document.getElementById('vbeep');
+  const scanline = document.getElementById('scanline');
+
+  // state
+  let recognition = null;
+  let listening = false;
+  let mode = 'normal'; // normal, combat, silent, night
+  let robotEffect = false;
+  let voices = [];
+  let chosenVoice = null;
+  let memoryCommands = {}; // user saved commands
+
+  // init voices
+  function loadVoices(){
+    voices = speechSynthesis.getVoices();
+    // try find a russian voice
+    chosenVoice = voices.find(v => v.lang && v.lang.startsWith('ru')) || voices[0] || null;
+    voiceLabel.innerText = chosenVoice ? (chosenVoice.name + ' ('+chosenVoice.lang+')') : 'по умолчанию';
+  }
+  loadVoices();
+  if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
+
+  function log(msg){
+    let time = new Date().toLocaleTimeString();
+    logEl.innerHTML = `<div class="small">[${time}] ${escapeHtml(msg)}</div>` + logEl.innerHTML;
+  }
+  function escapeHtml(s){ return (s+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // visual helpers
+  function setStatus(text, color){
+    statusEl.innerText = 'Статус: ' + text;
+    if(color) statusEl.style.boxShadow = `0 0 10px ${color}`;
+    else statusEl.style.boxShadow = '';
+  }
+  function pulseBeep(){
+    vbeep.style.opacity = 1;
+    setTimeout(()=> vbeep.style.opacity = 0, 120);
+  }
+  function setCore(text){
+    coreText.innerText = text;
+  }
+  function showScan(duration=1200){
+    scanline.style.opacity = 1;
+    scanline.style.transition = `opacity ${duration/1000}s linear`;
+    setTimeout(()=> scanline.style.opacity = 0, duration);
+  }
+
+  // speech output with optional robot-like effect (limited by browser API)
+  function speak(text, opts = {}){
+    const rateMap = {normal:1, combat:1.1, silent:0.95, night:0.9};
+    const pitchMap = {normal:1, combat:1.05, silent:0.95, night:0.9};
+    const rate = opts.rate || rateMap[mode] || 1;
+    const pitch = opts.pitch || pitchMap[mode] || 1;
+    if(robotEffect){
+      // Robot effect fallback: use short repeated syllables and lower pitch to imitate metallic voice.
+      // True timbre manipulation is limited in browsers — we can only tweak pitch/rate and choose voice.
+      let u = new SpeechSynthesisUtterance(text);
+      u.rate = rate * 0.95;
+      u.pitch = pitch * 0.6;
+      if(chosenVoice) u.voice = chosenVoice;
+      // small stutter for 'robot' flavor
+      u.onstart = () => pulseBeep();
+      speechSynthesis.speak(u);
+      return;
+    }
+    // normal speak
+    let u = new SpeechSynthesisUtterance(text);
+    u.rate = rate;
+    u.pitch = pitch;
+    if(chosenVoice) u.voice = chosenVoice;
+    u.onstart = () => pulseBeep();
+    speechSynthesis.speak(u);
+  }
+
+  // Mode UI
+  modesEls.forEach(el => {
+    el.addEventListener('click', () => {
+      modesEls.forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      mode = el.dataset.mode;
+      modeLabel.innerText = (el.innerText || 'Нормальный');
+      applyModeVisuals();
+      log('Режим: '+mode);
+      speak('Режим ' + (el.innerText || 'Нормальный') + ' активирован.');
+    });
+  });
+  // default active
+  document.querySelector('.mode[data-mode="normal"]').classList.add('active');
+
+  function applyModeVisuals(){
+    const root = document.documentElement;
+    if(mode === 'combat'){
+      root.style.setProperty('--accent','#ff6b6b');
+      document.body.style.background = 'linear-gradient(180deg,#100000,#0a0606)';
+      setCore('COMBAT');
+    } else if(mode === 'silent'){
+      root.style.setProperty('--accent','#7dd3fc');
+      document.body.style.background = 'linear-gradient(180deg,#001018,#001316)';
+      setCore('SILENT');
+    } else if(mode === 'night'){
+      root.style.setProperty('--accent','#6b7cff');
+      document.body.style.background = 'linear-gradient(180deg,#02021a,#001122)';
+      setCore('NIGHT');
+    } else {
+      root.style.setProperty('--accent','#00eaff');
+      document.body.style.background = 'linear-gradient(180deg,#000,#041018)';
+      setCore('ON');
+    }
+  }
+  applyModeVisuals();
+
+  // Commands handling
+  function handleCommand(cmdRaw){
+    const cmd = cmdRaw.toLowerCase().trim();
+    log('Распознано: ' + cmd);
+    showScan(800);
+    // if user saved a command triggers
+    for(const key of Object.keys(memoryCommands)){
+      if(cmd.includes(key)){
+        let action = memoryCommands[key];
+        log(`Выполняю запомненную команду: ${key} -> ${action}`);
+        executeAction(action);
+        return;
+      }
+    }
+
+    // Built-in commands
+    if(cmd.includes('джарвис')){
+      speak('Слушаю, брат.');
+      return;
+    }
+    if(cmd.includes('привет')){
+      speak('Привет, брат! Система активирована.');
+      return;
+    }
+    if(/время|который час/.test(cmd)){
+      let t = new Date().toLocaleTimeString();
+      speak('Сейчас ' + t);
+      return;
+    }
+    if(/дата|какая дата/.test(cmd)){
+      let d = new Date().toLocaleDateString();
+      speak('Сегодня ' + d);
+      return;
+    }
+    if(cmd.includes('скажи шутку') || cmd.includes('шутк')){
+      speak('Почему программисты не боятся темноты? Потому что у них есть светлая сторона — дебаггер.');
+      return;
+    }
+    if(cmd.includes('включи музыку') || cmd.includes('поставь музыку') || cmd.includes('музыку')){
+      speak('Включаю музыку.');
+      try{
+        executeAction({type:'audio', src:'music.mp3'});
+      }catch(e){ log('Ошибка при попытке включить музыку: ' + e); speak('Не удалось воспроизвести музыку.'); }
+      return;
+    }
+    if(cmd.startsWith('найди ')){
+      let q = cmd.replace('найди ', '').trim();
+      if(q){
+        speak('Ищу ' + q);
+        window.open('https://www.google.com/search?q=' + encodeURIComponent(q), '_blank');
+      } else speak('Что искать?');
+      return;
+    }
+    if(cmd.includes('открой youtube') || cmd.includes('открой ютуб') || cmd.includes('ютуб')){
+      speak('Открываю YouTube');
+      window.open('https://youtube.com', '_blank');
+      return;
+    }
+    if(cmd.includes('открой гугл') || cmd.includes('открой google') || cmd.includes('гугл')){
+      speak('Открываю Google');
+      window.open('https://google.com', '_blank');
+      return;
+    }
+    if(cmd.includes('инстаграм') || cmd.includes('instagram')){
+      speak('Открываю Instagram');
+      window.open('https://instagram.com', '_blank');
+      return;
+    }
+    if(cmd.includes('тик ток') || cmd.includes('tiktok')){
+      speak('Открываю TikTok');
+      window.open('https://tiktok.com', '_blank');
+      return;
+    }
+    if(cmd.includes('вконтакте') || cmd.includes('вк')){
+      speak('Открываю ВКонтакте');
+      window.open('https://vk.com', '_blank');
+      return;
+    }
+    if(cmd.includes('сканирование') || cmd.includes('сканирование')){
+      speak('Запускаю сканирование.');
+      startScanAnimation();
+      setTimeout(()=>{ speak('Сканирование завершено. Аномалий не обнаружено.'); }, 1800);
+      return;
+    }
+    if(cmd.startsWith('режим ')){
+      let r = cmd.replace('режим ','').trim();
+      const map = { 'боевой':'combat', 'боевой режим':'combat', 'тихий':'silent', 'ночной':'night', 'нормальный':'normal' };
+      if(map[r]){
+        document.querySelector(`.mode[data-mode="${map[r]}"]`).click();
+      } else {
+        speak('Не знаю такой режим.');
+      }
+      return;
+    }
+    if(cmd.includes('эффект робот') || cmd.includes('робот голос') || cmd.includes('голос робот')){
+      robotEffect = true;
+      speak('Роботизированный эффект включён.');
+      return;
+    }
+    if(cmd.includes('эффект обычный') || cmd.includes('убери робот')){
+      robotEffect = false;
+      speak('Обычный голос включён.');
+      return;
+    }
+    if(cmd.startsWith('запомни команду ')){
+      // формат: "запомни команду {фраза} => {действие}" или "запомни команду {фраза} разделитель {действие}"
+      let rest = cmd.replace('запомни команду ','').trim();
+      let parts = rest.split('=>');
+      if(parts.length<2) {
+        speak('Формат: запомни команду ФРАЗА => ДЕЙСТВИЕ');
+        return;
+      }
+      let phrase = parts[0].trim();
+      let action = parts.slice(1).join('=>').trim();
+      memoryCommands[phrase] = { type:'open', url: action.startsWith('http')? action : action }; // store raw, executor will try open or audio
+      speak('Запомнил команду: ' + phrase);
+      log('Добавлена команда: "'+phrase+'" => "'+action+'"');
+      return;
+    }
+
+    // fallback
+    speak('Не распознал команду. Повтори, брат.');
+  }
+
+  // Execute high-level action objects
+  function executeAction(action){
+    if(!action) return;
+    if(action.type === 'audio'){
+      let a = new Audio(action.src);
+      a.play().catch(e => log('Ошибка аудио: ' + e));
+      return;
+    }
+    if(action.type === 'open'){
+      if(action.url && action.url.startsWith('http')) window.open(action.url,'_blank');
+      else window.open('https://www.google.com/search?q=' + encodeURIComponent(action.url),'_blank');
+      return;
+    }
+    // if plain string try open as url or search
+    if(typeof action === 'string'){
+      if(action.endsWith('.mp3')) {
+        let a = new Audio(action);
+        a.play().catch(e => log('Ошибка аудио: ' + e));
+      } else if(action.startsWith('http')) window.open(action,'_blank');
+      else window.open('https://www.google.com/search?q=' + encodeURIComponent(action),'_blank');
+    }
+  }
+
+  // scan animation
+  function startScanAnimation(){
+    setStatus('Сканирование', 'var(--accent)');
+    showScan(900);
+    pulseBeep();
+    // visual core spin speed change
+    document.querySelector('.ring.r1').style.animationDuration = '6s';
+    setTimeout(()=>{ document.querySelector('.ring.r1').style.animationDuration = '20s'; setStatus('Активен'); }, 1400);
+  }
+
+  // create and start recognition
+  function createRecognition(){
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if(!window.SpeechRecognition){
+      log('Ошибка: SpeechRecognition API не поддерживается в этом браузере.');
+      speak('Этот браузер не поддерживает голосовое распознавание. Используй Chrome или Edge.');
+      return null;
+    }
+    const rec = new window.SpeechRecognition();
+    rec.lang = 'ru-RU';
+    rec.interimResults = false;
+    rec.continuous = true; // try to keep it listening
+    rec.maxAlternatives = 1;
+
+    rec.onresult = (evt) => {
+      if(!evt.results) return;
+      const text = evt.results[evt.results.length-1][0].transcript;
+      handleCommand(text);
+    };
+    rec.onerror = (e) => {
+      log('Recognition error: ' + e.error);
+      // if not allowed or other error
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+        speak('Доступ к микрофону заблокирован. Проверь настройки браузера.');
+        stopRecognition();
+      }
+    };
+    rec.onend = () => {
+      // автоперезапуск, если мы в режиме "слушать"
+      if(listening){
+        try{ rec.start(); } catch(e){ log('Ошибка перезапуска распознавания: '+e); }
+      }
+    };
+    return rec;
+  }
+
+  function startRecognition(){
+    if(listening) return;
+    recognition = createRecognition();
+    if(!recognition) return;
+    try{
+      recognition.start(); // первый старт потребует клик/разрешение
+      listening = true;
+      setStatus('Активен');
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      setCore('LISTEN');
+      log('Jarvis запущен. Постоянное прослушивание активно (после одобрения микрофона).');
+      speak('Jarvis активирован. Я слушаю.');
+    }catch(e){
+      log('Ошибка при запуске: ' + e);
+    }
+  }
+
+  function stopRecognition(){
+    if(!listening) return;
+    try{
+      recognition.stop();
+      recognition = null;
+    }catch(e){ }
+    listening = false;
+    setStatus('Остановлен');
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    setCore('OFF');
+    speak('Выключаю прослушивание.');
+    log('Jarvis остановлен.');
+  }
+
+  // button handlers
+  startBtn.addEventListener('click', async () => {
+    // user gesture — allowed to start microphone
+    // we will request microphone via SpeechRecognition.start(); browser will prompt if needed
+    startRecognition();
+  });
+  stopBtn.addEventListener('click', () => stopRecognition());
+
+  // keyboard quickstart: Alt+J to toggle
+  document.addEventListener('keydown', e => {
+    if(e.altKey && (e.key === 'j' || e.key === 'J')) {
+      if(listening) stopRecognition(); else startRecognition();
+    }
+  });
+
+  // initial log
+  log('Готов. Нажми "Запустить Jarvis" один раз, чтобы активировать постоянное прослушивание.');
+  setStatus('Ожидание');
+
+  // expose for console tinkering
+  window.jarvis = {
+    speak, startRecognition, stopRecognition, handleCommand, memoryCommands
+  };
+
+  // extras: try to show PWA install prompt if available
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    log('PWA готов к установке. Нажми меню браузера → Установить приложение.');
+  });
+
+})();
+</script>
+</body>
+</html>
